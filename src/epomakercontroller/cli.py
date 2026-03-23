@@ -2,6 +2,7 @@
 """Simple CLI for the EpomakerController package."""
 
 import tkinter as tk
+from dateutil import parser
 from functools import wraps
 
 import click
@@ -91,10 +92,19 @@ def cycle_light_modes(controller: EpomakerController) -> None:
 
 
 @cli.command()
+@click.argument("time", type=str, required=False)
 @wrapped_command
-def send_time(controller: EpomakerController) -> None:
-    """Send the current time to the Epomaker device."""
-    controller.send_time()
+def send_time(controller: EpomakerController, time: str) -> None:
+    """Send the current time to the Epomaker device.
+
+    Args:
+        controller (EpomakerController): Passed from wrapped_command() decorator
+        time (str): time to send (parsed by dateutil parser)
+    """
+    if time is not None:
+        time=parser.parse(time)
+
+    controller.send_time(time)
     Logger.log_info("Time sent successfully.")
 
 
