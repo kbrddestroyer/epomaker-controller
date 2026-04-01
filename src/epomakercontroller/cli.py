@@ -2,8 +2,8 @@
 """Simple CLI for the EpomakerController package."""
 
 import tkinter as tk
-from dateutil import parser
 from functools import wraps
+from dateutil import parser
 
 import click
 
