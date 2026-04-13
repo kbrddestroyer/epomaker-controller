@@ -35,6 +35,7 @@ from .commands import (
     EpomakerProfileCommand,
     EpomakerClearScreenCommand,
     EpomakerPollCommand,
+    EpomakerGifCommand
 )
 
 from .commands.data.constants import BUFF_LENGTH, Profile
@@ -326,6 +327,19 @@ class EpomakerController(ControllerBase):
         image_command = EpomakerImageCommand.EpomakerImageCommand()
         image_command.encode_image(image_path)
         self._send_command(image_command)
+
+    def send_gif(self, image_path: str) -> None:
+        """
+
+        """
+        if not os.path.isfile(image_path):
+            Logger.log_error(f"Could not find image: {image_path}")
+            return
+
+        gif_command = EpomakerGifCommand.EpomakerGifCommand(88, 100, (128, 64))
+        gif_command.encode_gif(image_path)
+
+        self._send_command(gif_command)
 
     def clear_image(self) -> None:
         """
