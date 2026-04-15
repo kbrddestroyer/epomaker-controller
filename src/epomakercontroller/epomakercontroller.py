@@ -336,9 +336,8 @@ class EpomakerController(ControllerBase):
             Logger.log_error(f"Could not find image: {image_path}")
             return
 
-        gif_command = EpomakerGifCommand.EpomakerGifCommand(88, 100, (128, 64))
-        gif_command.encode_gif(image_path)
-
+        gif_command = EpomakerGifCommand.EpomakerGifCommand(image_path, 100)
+        gif_command.encode_gif()
         self._send_command(gif_command)
 
     def clear_image(self) -> None:

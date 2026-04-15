@@ -1,7 +1,8 @@
 """Module for constructing commands to send to the Epomaker keyboard."""
 
 import dataclasses
-from typing import Iterator
+from abc import abstractmethod, ABCMeta
+from typing import Iterator, Optional
 import numpy as np
 import numpy.typing as npt
 
@@ -42,7 +43,18 @@ class CommandStructure:
         )
 
 
-class EpomakerCommand:
+class IEpomakerCommand:
+    """
+    TODO: Write docstring for interface
+    """
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def _insert_report(self, report: Report) -> None:
+        raise NotImplementedError
+
+
+class EpomakerCommand(IEpomakerCommand):
     """A command is basically just a wrapper around a numpy array of bytes.
 
     The command must have x dimension of 128 bytes and be padded with zeros if

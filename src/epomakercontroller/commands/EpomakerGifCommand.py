@@ -36,24 +36,24 @@ import numpy as np
 from PIL import Image
 
 from .EpomakerCommand import EpomakerCommand, CommandStructure
-from .EpomakerImageCommand import EpomakerImageCommand
 from .data.constants import IMAGE_DIMENSIONS
 from .reports.Report import Report, BUFF_LENGTH
 from .reports.ReportWithData import ReportWithData
+from .utils import image_utils
 from ..logger.logger import Logger
 
 
 # Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = IMAGE_DIMENSIONS  # (162, 173)
+SCREEN_WIDTH, SCREEN_HEIGHT = IMAGE_DIMENSIONS
 
+# TODO: I see that this is not the best way. Think of refactoring
 # Precompute all valid 4K-aligned dimension pairs (w, h) that fit the screen.
 # per_frame_size = w * h * 2 must be a multiple of 4096.
 _VALID_4K_DIMS: list[tuple[int, int, int]] = []  # (area, w, h)
-for _w in range(32, SCREEN_WIDTH + 1):
-    for _h in range(32, SCREEN_HEIGHT + 1):
+for _w in range(SCREEN_WIDTH + 1, 32, -1):
+    for _h in range(SCREEN_HEIGHT + 1, 32, -1):
         if (_w * _h * 2) % 4096 == 0:
             _VALID_4K_DIMS.append((_w * _h, _w, _h))
-_VALID_4K_DIMS.sort(reverse=True)  # largest area first
 
 
 class EpomakerGifCommand(EpomakerCommand):
@@ -77,16 +77,21 @@ class EpomakerGifCommand(EpomakerCommand):
         for area, w, h in _VALID_4K_DIMS:
             ar = w / h
             if abs(ar - target_ar) / target_ar <= max_ar_error:
-                return (w, h)
-        # Fallback: largest available
-        return (_VALID_4K_DIMS[0][1], _VALID_4K_DIMS[0][2])
+                return w, h
 
-    def __init__(self, n_frames: int, frame_delay_ms: int = 100,
-                 gif_dimensions: tuple[int, int] = (160, 128)) -> None:
-        self.n_frames = n_frames
+        return _VALID_4K_DIMS[0][1], _VALID_4K_DIMS[0][2]
+
+    def __init__(self, gif_path: str, frame_delay_ms: int) -> None:
+        prepared_data = self.prepare_gif(gif_path)
+
+        if not all(prepared_data):
+            return
+
+        self.gif, self.n_frames, self.gif_dimensions = prepared_data
         self.frame_delay_ms = frame_delay_ms
-        self.gif_dimensions = gif_dimensions
         self.report_data_header_length = 8
+
+        gif_dimensions = self.gif_dimensions
 
         # Raw pixel data per frame MUST be a multiple of 4096.
         # The firmware's animation framebuffer uses 4K page alignment;
@@ -98,25 +103,46 @@ class EpomakerGifCommand(EpomakerCommand):
                 f"{raw_per_frame} which is not a multiple of 4096. "
                 f"Choose dimensions where w*h*2 % 4096 == 0."
             )
+
         self.raw_per_frame = raw_per_frame
 
         data_payload = BUFF_LENGTH - 8  # 56 bytes
-        # Use raw per_frame_size (matches sniffed Epomaker GIF protocol)
         self.per_frame_size = raw_per_frame
         self.reports_per_frame = math.ceil(raw_per_frame / data_payload)
         self.data_reports_per_frame = self.reports_per_frame - 1
 
-        total_reports = n_frames * self.reports_per_frame
+        self.data_buff_length = BUFF_LENGTH - self.report_data_header_length  # 56
+        self.global_report_idx = 1  # init report is index 0
+        self.encoded = 0
+        self.composited_frames = None
+
+        total_reports = self.n_frames * self.reports_per_frame
         structure = CommandStructure(
             number_of_starter_reports=1,
             number_of_data_reports=total_reports,
             number_of_footer_reports=0,
         )
 
-        init_hex = self._build_init_header(n_frames, frame_delay_ms,
+        init_hex = self._build_init_header(self.n_frames, frame_delay_ms,
                                             self.per_frame_size, gif_dimensions)
         initial_report = Report(init_hex, index=0, checksum_index=None)
         super().__init__(initial_report, structure)
+
+    @staticmethod
+    def prepare_gif(gif_path: str):
+        if not os.path.isfile(gif_path):
+            Logger.log_error(f"Could not find GIF: {gif_path}")
+            return None, None, None
+
+        try:
+            gif = Image.open(gif_path)
+        except Exception as e:
+            Logger.log_error(f"Failed to open GIF: {e}")
+            return None, None, None
+
+        n_frames = getattr(gif, 'n_frames', 1)
+        gif_dimensions = EpomakerGifCommand.best_gif_dimensions(*IMAGE_DIMENSIONS)
+        return gif, n_frames, gif_dimensions
 
     @staticmethod
     def _build_init_header(n_frames: int, delay_ms: int,
@@ -176,7 +202,7 @@ class EpomakerGifCommand(EpomakerCommand):
         for y in range(image.shape[0]):
             for x in range(image.shape[1]):
                 r, g, b = image[y, x]
-                image_16bit[y, x] = EpomakerImageCommand._encode_rgb565(r, g, b)
+                image_16bit[y, x] = image_utils.encode_rgb565(r, g, b)
 
         return np.ndarray.flatten(EpomakerCommand._np16_to_np8(image_16bit))
 
@@ -203,67 +229,36 @@ class EpomakerGifCommand(EpomakerCommand):
             gif.seek(i)
             frame_rgba = gif.convert("RGBA")
 
-            # Paste this frame onto the canvas; the alpha channel acts as the
-            # mask so only non-transparent (changed) pixels are updated.
             canvas.paste(frame_rgba, (0, 0), frame_rgba)
             frames.append(canvas.copy().convert("RGB"))
 
-            # Handle disposal method for the NEXT frame's base canvas
             disposal = gif.disposal_method if hasattr(gif, 'disposal_method') else 0
             if disposal == 2:
-                # Restore to background colour (clear canvas)
                 canvas = Image.new("RGBA", gif.size, (0, 0, 0, 255))
-            # disposal 0/1 = keep canvas as-is (most common)
-            # disposal 3 = restore to previous (rare; we approximate with keep)
 
         return frames
 
-    def encode_gif(self, gif_path: str) -> None:
-        """Encode all GIF frames using per-frame report structure.
+    def __iter__(self):
+        for report in self.reports:
+            yield report
 
-        Each frame is encoded identically to a static image upload:
-        1000 data reports (type 0x38, seq 0-999) + 1 footer report
-        (type 0x34, seq 1000). Frame number increments per frame (1-based).
-        This exactly matches the proven working static image protocol.
-        """
-        if not os.path.isfile(gif_path):
-            Logger.log_error(f"Could not find GIF: {gif_path}")
-            return
+        data_buff_length = self.data_buff_length
+        global_report_id = self.global_report_idx
 
-        try:
-            gif = Image.open(gif_path)
-        except Exception as e:
-            Logger.log_error(f"Failed to open GIF: {e}")
-            return
-
-        actual_frames = getattr(gif, 'n_frames', 1)
-        if actual_frames != self.n_frames:
-            Logger.log_error(
-                f"Expected {self.n_frames} frames, GIF has {actual_frames}."
-            )
-            return
-
-        composited_frames = self._extract_composited_frames(gif)
-        Logger.log_info(f"Extracted {len(composited_frames)} composited frames")
-
-        data_buff_length = BUFF_LENGTH - self.report_data_header_length  # 56
-        global_report_idx = 1  # init report is index 0
-
-        for frame_idx, pil_frame in enumerate(composited_frames):
+        for frame_id, pil_frame in enumerate(self.composited_frames):
             try:
                 raw_bytes = self._prepare_frame_image(
                     pil_frame, self.gif_dimensions
                 ).tobytes()
-                # No extra padding needed вЂ” per_frame_size equals raw pixel data
+
                 frame_bytes = raw_bytes
             except Exception as e:
-                Logger.log_error(f"Exception encoding frame {frame_idx}: {e}")
+                Logger.log_error(f"Exception encoding frame {frame_id}: {e}")
                 return
 
-            frame_number = frame_idx + 1  # 1-based
+            frame_number = frame_id + 1  # 1-based
             data_pointer = 0
 
-            # Data reports: seq 0 to (reports_per_frame-2), type 0x38
             for seq in range(self.data_reports_per_frame):
                 seq_bytes = seq.to_bytes(2, "big")
                 report = ReportWithData(
@@ -271,7 +266,7 @@ class EpomakerGifCommand(EpomakerCommand):
                         "2500{frame:02x}00"
                         "{seq_upper:02x}{seq_lower:02x}38"
                     ),
-                    index=global_report_idx,
+                    index=global_report_id,
                     header_format_values={
                         "frame": frame_number,
                         "seq_upper": seq_bytes[1],
@@ -281,11 +276,9 @@ class EpomakerGifCommand(EpomakerCommand):
                 )
                 chunk = frame_bytes[data_pointer:data_pointer + data_buff_length]
                 report.add_data(chunk)
-                self._insert_report(report)
                 data_pointer += data_buff_length
-                global_report_idx += 1
+                yield report
 
-            # Footer report: last seq, type 0x34
             footer_seq = self.data_reports_per_frame
             footer_seq_bytes = footer_seq.to_bytes(2, "big")
             footer_report = ReportWithData(
@@ -293,7 +286,7 @@ class EpomakerGifCommand(EpomakerCommand):
                     "2500{frame:02x}00"
                     "{seq_upper:02x}{seq_lower:02x}34"
                 ),
-                index=global_report_idx,
+                index=global_report_id + 1,
                 header_format_values={
                     "frame": frame_number,
                     "seq_upper": footer_seq_bytes[1],
@@ -305,13 +298,27 @@ class EpomakerGifCommand(EpomakerCommand):
             # Pad remaining to data_buff_length (52 real bytes + 4 zero padding)
             padded = bytes(remaining) + b'\x00' * (data_buff_length - len(remaining))
             footer_report.add_data(padded)
-            self._insert_report(footer_report)
-            global_report_idx += 1
+            yield footer_report
+            self.global_report_idx += 2
+            Logger.log_info(f"Encoded frame {frame_id + 1}/{self.n_frames}")
 
-            Logger.log_info(f"Encoded frame {frame_idx + 1}/{self.n_frames}")
+    def encode_gif(self) -> None:
+        """Encode all GIF frames using per-frame report structure.
+
+        Each frame is encoded identically to a static image upload:
+        1000 data reports (type 0x38, seq 0-999) + 1 footer report
+        (type 0x34, seq 1000). Frame number increments per frame (1-based).
+        This exactly matches the proven working static image protocol.
+        """
+        gif = self.gif
+        if not gif:
+            Logger.log_error("Failed to encode GIF data")
+            return
+
+        self.composited_frames = self._extract_composited_frames(gif)
+        Logger.log_info(f"Extracted {len(self.composited_frames)} composited frames")
 
         self.report_data_prepared = True
-        # report_footer_prepared auto-True (number_of_footer_reports=0)
 
         expected_total = 1 + self.n_frames * self.reports_per_frame
         if len(self.reports) != expected_total:

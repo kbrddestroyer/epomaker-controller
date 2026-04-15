@@ -17,6 +17,7 @@ if os.name == "nt":
         os.mkdir(ROOT_FOLDER)
 
 TMP_FOLDER = os.path.abspath("./.epomaker_controller")
+LOG_FOLDER = os.path.abspath("./.logs")
 ETC_FOLDER = os.path.abspath(ROOT_FOLDER + "etc/")
 
 # Create folder on Windows
@@ -27,6 +28,9 @@ if os.name == "nt":
 # Create temp folder in project path on Linux as well
 if not os.path.exists(TMP_FOLDER):
     os.mkdir(TMP_FOLDER)
+
+if not os.path.exists(LOG_FOLDER):
+    os.mkdir(LOG_FOLDER)
 
 RULE_FILE_PATH = ETC_FOLDER + "/udev/rules.d/99-epomaker-rt100.rules"
 TMP_FILE_PATH = TMP_FOLDER + "/99-epomaker-rt100.rules"
