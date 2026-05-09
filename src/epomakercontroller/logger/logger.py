@@ -2,9 +2,10 @@ from __future__ import annotations
 import logging
 import os
 
-from click import style
 
-from src.epomakercontroller.configs.constants import LOG_FOLDER
+LOG_FOLDER = os.path.abspath("./.logs")
+if not os.path.exists(LOG_FOLDER):
+    os.mkdir(LOG_FOLDER)
 
 
 class Logger:

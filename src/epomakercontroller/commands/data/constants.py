@@ -7,7 +7,7 @@ from enum import Enum
 from dataclasses import dataclass
 
 BUFF_LENGTH = 128 // 2  # 128 bytes / 2 bytes per int
-IMAGE_DIMENSIONS = (160, 128)
+IMAGE_DIMENSIONS = (162, 173)
 
 
 @dataclass(frozen=True)

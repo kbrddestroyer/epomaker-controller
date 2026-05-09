@@ -31,11 +31,13 @@ Data report header (8 bytes):
 
 import math
 import os
+from typing import override
+
 import cv2
 import numpy as np
 from PIL import Image
 
-from .EpomakerCommand import EpomakerCommand, CommandStructure
+from .EpomakerCommand import EpomakerCommand, CommandStructure, EpomakerStreamedCommand, IEpomakerCommand
 from .data.constants import IMAGE_DIMENSIONS
 from .reports.Report import Report, BUFF_LENGTH
 from .reports.ReportWithData import ReportWithData
@@ -56,7 +58,7 @@ for _w in range(SCREEN_WIDTH + 1, 32, -1):
             _VALID_4K_DIMS.append((_w * _h, _w, _h))
 
 
-class EpomakerGifCommand(EpomakerCommand):
+class EpomakerGifCommand(EpomakerStreamedCommand):
     """A command for sending animated GIFs natively to the keyboard."""
 
     @staticmethod
@@ -204,7 +206,7 @@ class EpomakerGifCommand(EpomakerCommand):
                 r, g, b = image[y, x]
                 image_16bit[y, x] = image_utils.encode_rgb565(r, g, b)
 
-        return np.ndarray.flatten(EpomakerCommand._np16_to_np8(image_16bit))
+        return np.ndarray.flatten(IEpomakerCommand._np16_to_np8(image_16bit))
 
     @staticmethod
     def _extract_composited_frames(gif: Image.Image) -> list[Image.Image]:
@@ -238,10 +240,8 @@ class EpomakerGifCommand(EpomakerCommand):
 
         return frames
 
-    def __iter__(self):
-        for report in self.reports:
-            yield report
-
+    @override
+    def _generate_chunk(self):
         data_buff_length = self.data_buff_length
         global_report_id = self.global_report_idx
 
@@ -299,6 +299,7 @@ class EpomakerGifCommand(EpomakerCommand):
             padded = bytes(remaining) + b'\x00' * (data_buff_length - len(remaining))
             footer_report.add_data(padded)
             yield footer_report
+
             self.global_report_idx += 2
             Logger.log_info(f"Encoded frame {frame_id + 1}/{self.n_frames}")
 
@@ -317,11 +318,3 @@ class EpomakerGifCommand(EpomakerCommand):
 
         self.composited_frames = self._extract_composited_frames(gif)
         Logger.log_info(f"Extracted {len(self.composited_frames)} composited frames")
-
-        self.report_data_prepared = True
-
-        expected_total = 1 + self.n_frames * self.reports_per_frame
-        if len(self.reports) != expected_total:
-            Logger.log_error(
-                f"Expected {expected_total} total reports, got {len(self.reports)}."
-            )

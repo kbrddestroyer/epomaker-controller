@@ -330,7 +330,7 @@ class EpomakerController(ControllerBase):
 
     def send_gif(self, image_path: str) -> None:
         """
-
+        Sends animated image to the screen.
         """
         if not os.path.isfile(image_path):
             Logger.log_error(f"Could not find image: {image_path}")
