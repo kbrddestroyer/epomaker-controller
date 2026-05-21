@@ -2,7 +2,8 @@
     "VENDOR_ID": 12625,
     "PRODUCT_IDS_WIRED": [
         16400,
-        16405
+        16405,
+        20482
     ],
     "PRODUCT_IDS_24G": [
         16401,

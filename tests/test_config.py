@@ -72,7 +72,7 @@ def test_default_main_config():
 
     DEFAULT_MAIN_CONFIG = {
         "VENDOR_ID": 0x3151,
-        "PRODUCT_IDS_WIRED": [0x4010, 0x4015],
+        "PRODUCT_IDS_WIRED": [0x4010, 0x4015, 0x5002],
         "PRODUCT_IDS_24G": [0x4011, 0x4016],
         "USE_WIRELESS": False,
         "DEVICE_DESCRIPTION_REGEX": "ROYUAN .* System Control",
