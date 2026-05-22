@@ -245,7 +245,7 @@ class EpomakerController(ControllerBase):
         )
 
     def _send_command(
-        self, command: EpomakerCommand.EpomakerCommand, sleep_time: float = 1 / 1000,
+        self, command: EpomakerCommand.IEpomakerCommand, sleep_time: float = 1 / 1000,
         poll_first: bool = False
     ) -> None:
         """Sends a command to the HID device.
@@ -336,9 +336,9 @@ class EpomakerController(ControllerBase):
             Logger.log_error(f"Could not find image: {image_path}")
             return
 
-        gif_command = EpomakerGifCommand.EpomakerGifCommand(image_path, 100)
-        gif_command.encode_gif()
-        self._send_command(gif_command)
+        gif_command = EpomakerGifCommand.EpomakerGifCommand(image_path)
+        if gif_command.encode_gif():
+            self._send_command(gif_command)
 
     def clear_image(self) -> None:
         """

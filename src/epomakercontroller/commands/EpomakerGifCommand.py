@@ -45,52 +45,42 @@ from .utils import image_utils
 from ..logger.logger import Logger
 
 
-# Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = IMAGE_DIMENSIONS
-
-# TODO: I see that this is not the best way. Think of refactoring
-# Precompute all valid 4K-aligned dimension pairs (w, h) that fit the screen.
-# per_frame_size = w * h * 2 must be a multiple of 4096.
-_VALID_4K_DIMS: list[tuple[int, int, int]] = []  # (area, w, h)
-for _w in range(SCREEN_WIDTH + 1, 32, -1):
-    for _h in range(SCREEN_HEIGHT + 1, 32, -1):
-        if (_w * _h * 2) % 4096 == 0:
-            _VALID_4K_DIMS.append((_w * _h, _w, _h))
-
-
 class EpomakerGifCommand(EpomakerStreamedCommand):
     """A command for sending animated GIFs natively to the keyboard."""
 
+    FRAMERATE = 15
+
     @staticmethod
-    def best_gif_dimensions(source_width: int, source_height: int,
-                            max_ar_error: float = 0.20) -> tuple[int, int]:
+    def best_gif_dimensions(source_width: int, source_height: int) -> tuple[int, int]:
         """Find the largest 4K-aligned dimensions that fit the screen and
         best match the source GIF's aspect ratio.
 
         Args:
-            source_width: Original GIF width in pixels.
+            source_width: Original GIF width in pix els.
             source_height: Original GIF height in pixels.
-            max_ar_error: Maximum allowed aspect ratio deviation (0.20 = 20%).
 
         Returns:
             (width, height) tuple for the GIF upload.
         """
-        target_ar = source_width / source_height
-        for area, w, h in _VALID_4K_DIMS:
-            ar = w / h
-            if abs(ar - target_ar) / target_ar <= max_ar_error:
-                return w, h
+        compress_ratio = \
+            min(
+                IMAGE_DIMENSIONS[0] / source_width,
+                IMAGE_DIMENSIONS[1] / source_height,
+            )
 
-        return _VALID_4K_DIMS[0][1], _VALID_4K_DIMS[0][2]
+        source_width = math.ceil(source_width * compress_ratio)
+        source_height = math.ceil(source_height * compress_ratio)
 
-    def __init__(self, gif_path: str, frame_delay_ms: int) -> None:
+        return math.floor(source_width / 64) * 64, math.floor(source_height / 64) * 64
+
+    def __init__(self, gif_path: str) -> None:
         prepared_data = self.prepare_gif(gif_path)
 
         if not all(prepared_data):
             return
 
-        self.gif, self.n_frames, self.gif_dimensions = prepared_data
-        self.frame_delay_ms = frame_delay_ms
+        self.gif, self.n_frames, self.step, self.gif_dimensions = prepared_data
+        self.frame_delay_ms = frame_delay_ms = int(1000 / self.FRAMERATE * self.step)
         self.report_data_header_length = 8
 
         gif_dimensions = self.gif_dimensions
@@ -142,9 +132,13 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
             Logger.log_error(f"Failed to open GIF: {e}")
             return None, None, None
 
-        n_frames = getattr(gif, 'n_frames', 1)
-        gif_dimensions = EpomakerGifCommand.best_gif_dimensions(*IMAGE_DIMENSIONS)
-        return gif, n_frames, gif_dimensions
+        n_frames_actual = getattr(gif, 'n_frames', 1)
+        n_frames = min(n_frames_actual, 56)
+        step = n_frames_actual / n_frames
+
+        gif_dimensions = EpomakerGifCommand.best_gif_dimensions(*gif.size)
+        Logger.log_info(f"New GIF size if {gif_dimensions}")
+        return gif, n_frames, step, gif_dimensions
 
     @staticmethod
     def _build_init_header(n_frames: int, delay_ms: int,
@@ -208,8 +202,7 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
 
         return np.ndarray.flatten(IEpomakerCommand._np16_to_np8(image_16bit))
 
-    @staticmethod
-    def _extract_composited_frames(gif: Image.Image) -> list[Image.Image]:
+    def _extract_composited_frames(self, gif: Image.Image) -> list[Image.Image]:
         """Extract all frames from a GIF with proper compositing.
 
         Optimized GIFs use partial/diff frames where only changed pixels are
@@ -223,12 +216,13 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
         Returns:
             list[Image.Image]: List of fully composited RGB frames.
         """
-        n_frames = getattr(gif, 'n_frames', 1)
+        step = self.step
+
         canvas = Image.new("RGBA", gif.size, (0, 0, 0, 255))
         frames: list[Image.Image] = []
 
-        for i in range(n_frames):
-            gif.seek(i)
+        for i in range(self.n_frames):
+            gif.seek(int(i * step))
             frame_rgba = gif.convert("RGBA")
 
             canvas.paste(frame_rgba, (0, 0), frame_rgba)
@@ -295,7 +289,7 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
                 checksum_index=7,
             )
             remaining = frame_bytes[data_pointer:]
-            # Pad remaining to data_buff_length (52 real bytes + 4 zero padding)
+
             padded = bytes(remaining) + b'\x00' * (data_buff_length - len(remaining))
             footer_report.add_data(padded)
             yield footer_report
@@ -303,7 +297,7 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
             self.global_report_idx += 2
             Logger.log_info(f"Encoded frame {frame_id + 1}/{self.n_frames}")
 
-    def encode_gif(self) -> None:
+    def encode_gif(self) -> bool:
         """Encode all GIF frames using per-frame report structure.
 
         Each frame is encoded identically to a static image upload:
@@ -314,7 +308,8 @@ class EpomakerGifCommand(EpomakerStreamedCommand):
         gif = self.gif
         if not gif:
             Logger.log_error("Failed to encode GIF data")
-            return
+            return False
 
         self.composited_frames = self._extract_composited_frames(gif)
         Logger.log_info(f"Extracted {len(self.composited_frames)} composited frames")
+        return True
