@@ -50,6 +50,11 @@ def upload_image(controller: EpomakerController, image_path: str) -> None:
         controller (EpomakerController): Passed from wrapped_command() decorator
         image_path (str): The path to the image file to upload.
     """
+    if image_path[-4:] == ".gif":
+        controller.send_gif(image_path)
+        Logger.log_info("Animation uploaded.")
+        return
+
     controller.send_image(image_path)
     Logger.log_info("Image uploaded successfully.")
 

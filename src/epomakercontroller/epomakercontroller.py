@@ -35,6 +35,7 @@ from .commands import (
     EpomakerProfileCommand,
     EpomakerClearScreenCommand,
     EpomakerPollCommand,
+    EpomakerGifCommand
 )
 
 from .commands.data.constants import BUFF_LENGTH, Profile
@@ -244,7 +245,7 @@ class EpomakerController(ControllerBase):
         )
 
     def _send_command(
-        self, command: EpomakerCommand.EpomakerCommand, sleep_time: float = 1 / 1000,
+        self, command: EpomakerCommand.IEpomakerCommand, sleep_time: float = 1 / 1000,
         poll_first: bool = False
     ) -> None:
         """Sends a command to the HID device.
@@ -326,6 +327,18 @@ class EpomakerController(ControllerBase):
         image_command = EpomakerImageCommand.EpomakerImageCommand()
         image_command.encode_image(image_path)
         self._send_command(image_command)
+
+    def send_gif(self, image_path: str) -> None:
+        """
+        Sends animated image to the screen.
+        """
+        if not os.path.isfile(image_path):
+            Logger.log_error(f"Could not find image: {image_path}")
+            return
+
+        gif_command = EpomakerGifCommand.EpomakerGifCommand(image_path)
+        if gif_command.encode_gif():
+            self._send_command(gif_command)
 
     def clear_image(self) -> None:
         """

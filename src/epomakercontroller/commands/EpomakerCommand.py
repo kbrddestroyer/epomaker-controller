@@ -1,7 +1,8 @@
 """Module for constructing commands to send to the Epomaker keyboard."""
 
 import dataclasses
-from typing import Iterator
+from abc import abstractmethod, ABCMeta
+from typing import Iterator, override
 import numpy as np
 import numpy.typing as npt
 
@@ -42,7 +43,39 @@ class CommandStructure:
         )
 
 
-class EpomakerCommand:
+class IEpomakerCommand(metaclass=ABCMeta):
+    """
+    TODO: Write docstring for interface
+    """
+
+    def __init__(self):
+        self.report_data_prepared: bool = False
+        self.report_footer_prepared: bool = False
+
+    @abstractmethod
+    def __iter__(self):
+        raise NotImplementedError
+
+    @staticmethod
+    def _np16_to_np8(data_16bit: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint8]:
+        """Converts a numpy array of 16-bit numbers to 8-bit numbers.
+
+        Args:
+            data_16bit (npt.NDArray[np.uint16]): The 16-bit data.
+
+        Returns:
+            npt.NDArray[np.uint8]: The 8-bit data.
+        """
+        new_shape = (data_16bit.shape[0], data_16bit.shape[1] * 2)
+        data_8bit_flat = np.empty(data_16bit.size * 2, dtype=np.uint8)
+
+        data_8bit_flat[0::2] = (data_16bit >> 8).flatten()  # High bytes
+        data_8bit_flat[1::2] = (data_16bit & 0xFF).flatten()  # Low bytes
+
+        return data_8bit_flat.reshape(new_shape)
+
+
+class EpomakerCommand(IEpomakerCommand):
     """A command is basically just a wrapper around a numpy array of bytes.
 
     The command must have x dimension of 128 bytes and be padded with zeros if
@@ -64,6 +97,8 @@ class EpomakerCommand:
             initial_report (Report): The initial report.
             structure (CommandStructure): The structure of the command (default: None).
         """
+        super().__init__()
+
         if not structure:
             structure = CommandStructure()
         self.reports: ReportCollection = ReportCollection()
@@ -82,24 +117,7 @@ class EpomakerCommand:
 
         self.reports.append(report)
 
-    @staticmethod
-    def _np16_to_np8(data_16bit: npt.NDArray[np.uint16]) -> npt.NDArray[np.uint8]:
-        """Converts a numpy array of 16-bit numbers to 8-bit numbers.
-
-        Args:
-            data_16bit (npt.NDArray[np.uint16]): The 16-bit data.
-
-        Returns:
-            npt.NDArray[np.uint8]: The 8-bit data.
-        """
-        new_shape = (data_16bit.shape[0], data_16bit.shape[1] * 2)
-        data_8bit_flat = np.empty(data_16bit.size * 2, dtype=np.uint8)
-
-        data_8bit_flat[0::2] = (data_16bit >> 8).flatten()  # High bytes
-        data_8bit_flat[1::2] = (data_16bit & 0xFF).flatten()  # Low bytes
-
-        return data_8bit_flat.reshape(new_shape)
-
+    @override
     def __iter__(self) -> Iterator[Report]:
         """Iterates over the reports in the command.
 
@@ -127,3 +145,33 @@ class EpomakerCommand:
             Iterator[bytes]: The report bytes.
         """
         yield from self.reports.iter_report_bytes()
+
+
+class EpomakerStreamedCommand(IEpomakerCommand):
+    """
+    Epomaker command, that streams command without data preparing.
+    """
+
+    def __init__(
+            self,
+            initial_report: Report,
+            structure: CommandStructure | None = None,
+    ):
+        super().__init__()
+
+        if not structure:
+            structure = CommandStructure()
+
+        self.structure: CommandStructure = structure
+        self.report_data_prepared: bool = True
+        self.report_footer_prepared: bool = structure.number_of_footer_reports == 0
+        self.__initial_report: Report = initial_report
+
+    @abstractmethod
+    def _generate_chunk(self) -> Iterator[Report]:
+        raise NotImplementedError
+
+    @override
+    def __iter__(self):
+        yield self.__initial_report
+        yield from self._generate_chunk()

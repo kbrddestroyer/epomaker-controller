@@ -40,3 +40,9 @@ def test_wrong_format():
 
     controller.send_temperature(90)
     assert controller.commands
+
+
+def test_streamed_command():
+    controller = FakeEpomakerController(cli.CONFIG_MAIN)
+
+

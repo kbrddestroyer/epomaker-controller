@@ -1,29 +1,37 @@
 from __future__ import annotations
+import logging
+import os
 
-import enum
 
-
-class LogScope(enum.StrEnum):
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
+LOG_FOLDER = os.path.abspath("./.logs")
+if not os.path.exists(LOG_FOLDER):
+    os.mkdir(LOG_FOLDER)
 
 
 class Logger:
+    _G_LOGGER = logging.getLogger("EpomakerController")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)8s: %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(LOG_FOLDER, "epomakercontroller.log")),
+            logging.StreamHandler()
+        ]
+    )
+
     @staticmethod
-    def log(scope: LogScope, message: str):
+    def log(level: int, message: str):
         # TODO: Refactor to logging library w/ custom format + file writing
-        # pylint: disable=bad-builtin
-        print(f"{scope.value}: {message}")
+        Logger._G_LOGGER.log(level, message)
 
     @staticmethod
     def log_info(message: str):
-        Logger.log(LogScope.INFO, message)
+        Logger.log(logging.INFO, message)
 
     @staticmethod
     def log_warning(message: str):
-        Logger.log(LogScope.WARNING, message)
+        Logger.log(logging.WARNING, message)
 
     @staticmethod
     def log_error(message: str):
-        Logger.log(LogScope.ERROR, message)
+        Logger.log(logging.ERROR, message)
