@@ -1,6 +1,4 @@
-"""
-Large command that should be streamed directly to keyboard without storing data
-"""
+"""Large command that should be streamed directly to keyboard without storing data"""
 from epomakercontroller.commands.EpomakerCommand import EpomakerCommand
 from epomakercontroller.commands.reports.Report import Report
 

@@ -65,8 +65,7 @@ def test_config_creation():
 
 
 def test_default_main_config():
-    """
-    This test was created during DEFAULT_MAIN_CONFIG dict migration
+    """This test was created during DEFAULT_MAIN_CONFIG dict migration
     That made migration a test-driven process. That guarantees that nothing was broken in process
     """
 

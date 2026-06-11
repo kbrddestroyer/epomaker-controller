@@ -2,8 +2,7 @@ import time
 
 
 class TimeHelper:
-    """
-    A helper class to ensure a minimum amount of time has passed between its creation and deletion.
+    """A helper class to ensure a minimum amount of time has passed between its creation and deletion.
 
     This class starts a timer when it is initialized. When it is deleted, it calculates the total
     elapsed time and enforces a delay to ensure that the specified minimum time has passed.

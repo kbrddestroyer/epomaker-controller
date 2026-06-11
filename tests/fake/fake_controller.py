@@ -10,8 +10,7 @@ if typing.TYPE_CHECKING:
 
 
 class FakeEpomakerController(EpomakerController):
-    """
-    This fixture should help in testing low-level functionality.
+    """This fixture should help in testing low-level functionality.
     Overrides some behaviour, related to HID devices. This approach
     will disconnect unit tests from physical devices.
     """
