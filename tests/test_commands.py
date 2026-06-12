@@ -14,9 +14,7 @@ def test_send_image():
 
 
 def test_send_image_wrong_path():
-    """
-    No fail, but no command being executed
-    """
+    """No fail, but no command being executed"""
 
     controller = FakeEpomakerController(cli.CONFIG_MAIN)
     controller.send_image(os.path.abspath("tests/data/calibration_nonexistent.png"))

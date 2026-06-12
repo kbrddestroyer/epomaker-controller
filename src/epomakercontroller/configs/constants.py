@@ -1,5 +1,4 @@
-"""
-The main goal of this file is to prevent appearance of "magic" symbols in code,
+"""The main goal of this file is to prevent appearance of "magic" symbols in code,
 and provide a single point of project configuration
 """
 import os

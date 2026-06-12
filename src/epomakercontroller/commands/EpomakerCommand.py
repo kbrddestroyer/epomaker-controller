@@ -44,9 +44,7 @@ class CommandStructure:
 
 
 class IEpomakerCommand(metaclass=ABCMeta):
-    """
-    TODO: Write docstring for interface
-    """
+    """TODO: Write docstring for interface"""
 
     def __init__(self):
         self.report_data_prepared: bool = False
@@ -148,9 +146,7 @@ class EpomakerCommand(IEpomakerCommand):
 
 
 class EpomakerStreamedCommand(IEpomakerCommand):
-    """
-    Epomaker command, that streams command without data preparing.
-    """
+    """Epomaker command, that streams command without data preparing."""
 
     def __init__(
             self,

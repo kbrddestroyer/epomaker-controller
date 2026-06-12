@@ -49,9 +49,7 @@ if typing.TYPE_CHECKING:
 
 # pylint: disable=R0903
 class EpomakerConfig:
-    """
-    Configuration class that stores EpomakerController settings, parsed from config.json
-    """
+    """Configuration class that stores EpomakerController settings, parsed from config.json"""
 
     def __init__(self, config_main: Config) -> None:
         all_configs = get_all_configs()
@@ -302,9 +300,7 @@ class EpomakerController(ControllerBase):
         return "01010168" in response.hex()
 
     def send_wireless_init(self) -> bool:
-        """
-        Sends wireless init command to the HID device. Required before 2.4GHz mode usage
-        """
+        """Sends wireless init command to the HID device. Required before 2.4GHz mode usage"""
 
         if self.__check_whistle_response(bytes(self.poll())):
             return True
@@ -329,9 +325,7 @@ class EpomakerController(ControllerBase):
         self._send_command(image_command)
 
     def send_gif(self, image_path: str) -> None:
-        """
-        Sends animated image to the screen.
-        """
+        """Sends animated image to the screen."""
         if not os.path.isfile(image_path):
             Logger.log_error(f"Could not find image: {image_path}")
             return
@@ -341,9 +335,7 @@ class EpomakerController(ControllerBase):
             self._send_command(gif_command)
 
     def clear_image(self) -> None:
-        """
-        Sends command to completely clear the screen. Please note that you cannot revert this action.
-        """
+        """Sends command to completely clear the screen. Please note that you cannot revert this action."""
         self._send_command(EpomakerClearScreenCommand.EpomakerClearScreenCommand())
 
     def send_time(self, time_to_send: datetime | None = None) -> None:

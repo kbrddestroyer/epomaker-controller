@@ -1,4 +1,2 @@
-"""
-Command buffer, that streams data directly to keyboard
-"""
+"""Command buffer, that streams data directly to keyboard"""
 

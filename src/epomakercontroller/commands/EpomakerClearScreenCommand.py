@@ -3,14 +3,10 @@ from epomakercontroller.commands.reports.Report import Report
 
 
 class EpomakerClearScreenCommand(EpomakerCommand):
-    """
-    Clear screen command. Resets the image, does not affect telemetry information on the screen
-    """
+    """Clear screen command. Resets the image, does not affect telemetry information on the screen"""
 
     def __init__(self) -> None:
-        """
-        Initialize URB data with 0xAC command to clear the screen.
-        """
+        """Initialize URB data with 0xAC command to clear the screen."""
         header = 0xAC
         footer = 0xFF - header
 

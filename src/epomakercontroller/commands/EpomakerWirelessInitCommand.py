@@ -1,6 +1,4 @@
-"""
-Todo: write docstrings for this class
-"""
+"""Todo: write docstrings for this class"""
 
 from .EpomakerCommand import EpomakerCommand, CommandStructure
 from .reports.Report import Report

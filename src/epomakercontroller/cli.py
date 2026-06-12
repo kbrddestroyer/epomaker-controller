@@ -19,9 +19,7 @@ CONFIG_MAIN = load_main_config()
 
 
 def wrapped_command(func):
-    """
-    Simple wrapper around command call. Propagates function name and docstring to click
-    """
+    """Simple wrapper around command call. Propagates function name and docstring to click"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         with EpomakerController(CONFIG_MAIN) as controller:
@@ -62,8 +60,7 @@ def upload_image(controller: EpomakerController, image_path: str) -> None:
 @cli.command()
 @wrapped_command
 def clear_screen(controller: EpomakerController) -> None:
-    """
-    Clear the screen.
+    """Clear the screen.
     Please note, that you cannot revert this action!
     """
     controller.clear_image()

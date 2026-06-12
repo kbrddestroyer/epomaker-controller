@@ -14,8 +14,7 @@ if typing.TYPE_CHECKING:
 
 
 class ControllerBase(metaclass=ABCMeta):
-    """
-    Just a base class for every type of controller.
+    """Just a base class for every type of controller.
     I assume you plan to support multiple keyboard types. Must be useful
     """
     def __init__(self):
