@@ -130,6 +130,24 @@ epomakercontroller start-daemon
 
 The daemon will also update the date and time once when it starts
 
+### Upload images while the daemon is running
+
+If you run the daemon as a systemd service, stop it before uploading an image and
+start it again afterwards. The helper script in `service/epomaker-upload-image`
+does this automatically:
+
+```console
+service/epomaker-upload-image path/to/image.png
+```
+
+By default it controls `epomaker-controller.service` and runs `epomakercontroller`
+from `PATH`. You can override both values if your service or command is named
+differently:
+
+```console
+EPOMAKER_SERVICE_NAME=my-epomaker.service EPOMAKER_CONTROLLER_BIN=/path/to/epomakercontroller service/epomaker-upload-image path/to/image.png
+```
+
 ### Show connected devices
 
 You can print all the available information about the connected keyboard using the 'dev'

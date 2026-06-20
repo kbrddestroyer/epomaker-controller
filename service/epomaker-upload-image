@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SERVICE_NAME="${EPOMAKER_SERVICE_NAME:-epomaker-controller.service}"
+CONTROLLER_BIN="${EPOMAKER_CONTROLLER_BIN:-epomakercontroller}"
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: epomaker-upload-image IMAGE_PATH" >&2
+  exit 2
+fi
+
+was_active=0
+if systemctl is-active --quiet "$SERVICE_NAME"; then
+  was_active=1
+  systemctl stop "$SERVICE_NAME"
+fi
+
+restart_service() {
+  if [[ "$was_active" -eq 1 ]]; then
+    systemctl start "$SERVICE_NAME"
+  fi
+}
+trap restart_service EXIT
+
+"$CONTROLLER_BIN" upload-image "$1"
